@@ -1,0 +1,8 @@
+services:
+  app-tg:
+    image: py_app
+    build:
+      context: .
+    env_file:
+      - .env
+

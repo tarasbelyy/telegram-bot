@@ -7,8 +7,10 @@ annotated-types==0.7.0
 attrs==26.1.0
 build==1.5.0
 certifi==2026.6.17
+charset-normalizer==3.4.9
 click==8.4.2
 colorama==0.4.6
+dotenv==0.9.9
 frozenlist==1.8.0
 idna==3.18
 magic-filter==1.0.12
@@ -19,8 +21,11 @@ propcache==0.5.2
 pydantic==2.13.4
 pydantic_core==2.46.4
 pyproject_hooks==1.2.0
+python-dotenv==1.2.2
+requests==2.34.2
 setuptools==83.0.0
 typing-inspection==0.4.2
 typing_extensions==4.16.0
+urllib3==2.7.0
 wheel==0.47.0
 yarl==1.24.2
