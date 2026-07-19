@@ -64,6 +64,11 @@ async def start_bot(callback):
 
 @dp.callback_query(F.data[:6] == 'option')
 async def select_option(callback):
+    if username not in USERS_BOTS:
+        await callback.message.answer(
+            'Чат-бот не выбран. Для просмотра списка чат-ботов введите /start'
+        )
+        return
     option = callback.data[7:]
     USERS_OPTIONS[username] = option
     await callback.message.answer(text=f'Выбор: {option}, введите текст')
@@ -88,6 +93,11 @@ async def get_ai_answer(message):
         json=payload, headers=headers
     )
     answer = response.json()
+    if 'next' not in answer:
+        await message.answer(
+            'Ошибка. Для просмотра списка чат-ботов введите /start'
+        )
+        return
     builder = InlineKeyboardBuilder()
     if answer.get('next') == '-':
         await message.answer(answer.get('message'))
