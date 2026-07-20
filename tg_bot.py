@@ -28,12 +28,15 @@ async def cmd_start(message):
     builder = InlineKeyboardBuilder()
     response = requests.get('http://151.243.217.107/api/v1/bots/')
     chatbots = response.json()
+    text_message = 'Выберите чат-бота:'
     for chatbot in chatbots:
+        text_message += f'\n\n - {chatbot.get("name")}:'
+        text_message += f'\n{chatbot.get("description")}'
         builder.button(
             text=chatbot.get('name'),
             callback_data=f'chatbot {chatbot.get("id")}'
         )
-    await message.answer('Выберите чат-бота', reply_markup=builder.as_markup())
+    await message.answer(text_message, reply_markup=builder.as_markup())
 
 
 @dp.callback_query(F.data[:7] == 'chatbot')
