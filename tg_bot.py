@@ -11,14 +11,19 @@ from dotenv import load_dotenv
 load_dotenv()
 
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+API_USERS_NUMBER = int(os.getenv('API_USERS_NUMBER', '1'))
+
+api_users_data = dict()
+
+for i in range(API_USERS_NUMBER):
+    username = os.getenv(f'API_USERNAME_{i}')
+    password = os.getenv(f'API_PASSWORD_{i}')
+    api_users_data[username] = password
 
 tg_users_tokens = dict()
 tg_users_bots = dict()
 tg_users_options = dict()
 
-api_users_data = {
-    os.getenv('API_USERNAME'): os.getenv('API_PASSWORD')
-}
 
 available_api_users = deque(api_users_data.keys())
 tg_users_api_users = dict()
