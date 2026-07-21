@@ -34,6 +34,14 @@ dp = Dispatcher()
 
 @dp.message(F.text == '/start')
 async def cmd_start(message):
+    tg_user_id = str(message.from_user.id)
+    tg_users_tokens.pop(tg_user_id, None)
+    tg_users_bots.pop(tg_user_id, None)
+    tg_users_options.pop(tg_user_id, None)
+    if tg_user_id in tg_users_api_users:
+        username = tg_users_api_users[tg_user_id]
+        del tg_users_api_users[tg_user_id]
+        available_api_users.append(username)
     builder = InlineKeyboardBuilder()
     response = requests.get('http://151.243.217.107/api/v1/bots/')
     chatbots = response.json()
@@ -51,14 +59,14 @@ async def cmd_start(message):
 
 @dp.callback_query(F.data[:7] == 'chatbot')
 async def start_bot(callback):
-    tg_username = callback.from_user.username
+    tg_user_id = str(callback.from_user.id)
     if available_api_users:
-        tg_users_api_users[tg_username] = available_api_users.popleft()
+        tg_users_api_users[tg_user_id] = available_api_users.popleft()
     else:
         await callback.message.answer('Попробуйте позже')
         return
     await callback.message.edit_reply_markup(reply_marup=None)
-    username = tg_users_api_users[tg_username]
+    username = tg_users_api_users[tg_user_id]
     password = api_users_data[username]
     payload = {'username': username, 'password': password}
     response = requests.post(
@@ -66,7 +74,7 @@ async def start_bot(callback):
         json=payload
     )
     token = response.json().get('token')
-    tg_users_tokens[tg_username] = token
+    tg_users_tokens[tg_user_id] = token
     chatbot_id = callback.data[8:]
     headers = {'Authorization': f'Token {token}'}
     response = requests.get(
@@ -74,7 +82,7 @@ async def start_bot(callback):
         headers=headers
     )
     answer = response.json()
-    tg_users_bots[tg_username] = chatbot_id
+    tg_users_bots[tg_user_id] = chatbot_id
     builder = InlineKeyboardBuilder()
     for option in answer.get('next'):
         builder.button(text=option, callback_data=f'option {option}')
@@ -86,33 +94,33 @@ async def start_bot(callback):
 
 @dp.callback_query(F.data[:6] == 'option')
 async def select_option(callback):
-    tg_username = callback.from_user.username
-    if tg_username is None or tg_username not in tg_users_bots:
+    tg_user_id = str(callback.from_user.id)
+    if tg_user_id not in tg_users_bots:
         await callback.message.answer(
             'Чат-бот не выбран. Для просмотра списка чат-ботов введите /start'
         )
         return
     option = callback.data[7:]
-    tg_users_options[tg_username] = option
+    tg_users_options[tg_user_id] = option
     await callback.message.answer(text=f'Выбор: {option}, введите текст')
 
 
 @dp.message(F.text != '')
 async def get_ai_answer(message):
-    tg_username = message.from_user.username
-    username = tg_users_api_users.get(tg_username)
-    chatbot_id = tg_users_bots.get(tg_username)
+    tg_user_id = str(message.from_user.id)
+    username = tg_users_api_users.get(tg_user_id)
+    chatbot_id = tg_users_bots.get(tg_user_id)
     if chatbot_id is None:
         await message.answer(
             'Чат-бот не выбран. Для просмотра списка чат-ботов введите /start'
         )
         return
-    option = tg_users_options.get(tg_username)
+    option = tg_users_options.get(tg_user_id)
     if option is None:
         await message.answer('Выберите опцию')
         return
     payload = {'next': option, 'message': message.text}
-    headers = {'Authorization': f'Token {tg_users_tokens[tg_username]}'}
+    headers = {'Authorization': f'Token {tg_users_tokens[tg_user_id]}'}
     response = requests.post(
         f'http://151.243.217.107/api/v1/bots/{chatbot_id}/run/',
         json=payload, headers=headers
@@ -129,10 +137,10 @@ async def get_ai_answer(message):
         await message.answer(
             'Чат-бот не выбран. Для просмотра списка чат-ботов введите /start'
         )
-        del tg_users_bots[tg_username]
-        del tg_users_options[tg_username]
-        del tg_users_tokens[tg_username]
-        del tg_users_api_users[tg_username]
+        del tg_users_bots[tg_user_id]
+        del tg_users_options[tg_user_id]
+        del tg_users_tokens[tg_user_id]
+        del tg_users_api_users[tg_user_id]
         available_api_users.append(username)
         return
     for option in answer.get('next'):
@@ -141,7 +149,7 @@ async def get_ai_answer(message):
         answer.get('message'),
         reply_markup=builder.as_markup()
     )
-    del tg_users_options[tg_username]
+    del tg_users_options[tg_user_id]
 
 
 async def main():
