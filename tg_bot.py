@@ -48,6 +48,12 @@ async def cmd_start(message):
     builder = InlineKeyboardBuilder()
     response = requests.get('http://151.243.217.107/api/v1/bots/')
     chatbots = response.json()
+    if not isinstance(chatbots, list):
+        await message.answer('Ошибка. Попробуйте позже')
+        return
+    if not chatbots:
+        await message.answer('Пока нет доступных чат-ботов')
+        return
     text_message = 'Выберите чат-бота:'
     for chatbot in chatbots:
         text_message += f'\n\n - {chatbot.get("name")}:'
@@ -135,7 +141,6 @@ async def get_ai_answer(message):
     )
     answer = response.json()
     if 'next' not in answer:
-
         await message.answer(
             'Ошибка. Для просмотра списка чат-ботов введите /start'
         )
