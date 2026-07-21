@@ -86,6 +86,7 @@ async def start_bot(callback):
     builder = InlineKeyboardBuilder()
     for option in answer.get('next'):
         builder.button(text=option, callback_data=f'option {option}')
+    builder.adjust(1)
     await callback.message.answer(
         answer.get('message'),
         reply_markup=builder.as_markup()
@@ -145,6 +146,7 @@ async def get_ai_answer(message):
         return
     for option in answer.get('next'):
         builder.button(text=option, callback_data=f'option {option}')
+    builder.adjust(1)
     await message.answer(
         answer.get('message'),
         reply_markup=builder.as_markup()
