@@ -13,19 +13,24 @@ load_dotenv()
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 API_USERS_NUMBER = int(os.getenv('API_USERS_NUMBER', '1'))
 
-api_users_data = dict()
+API_USERS_DATA = dict()
 
 for i in range(API_USERS_NUMBER):
     username = os.getenv(f'API_USERNAME_{i}')
     password = os.getenv(f'API_PASSWORD_{i}')
-    api_users_data[username] = password
+    API_USERS_DATA[username] = password
+
+EXIT_PHRASES = {
+    'завершить',
+    'выход',
+}
 
 tg_users_tokens = dict()
 tg_users_bots = dict()
 tg_users_options = dict()
 
 
-available_api_users = deque(api_users_data.keys())
+available_api_users = deque(API_USERS_DATA.keys())
 tg_users_api_users = dict()
 
 bot = Bot(TELEGRAM_BOT_TOKEN)
@@ -42,7 +47,7 @@ def free_resources(tg_user_id):
 
 
 @dp.message(F.text == '/start')
-async def cmd_start(message):
+async def start_telegram_bot(message):
     tg_user_id = str(message.from_user.id)
     free_resources(tg_user_id)
     builder = InlineKeyboardBuilder()
@@ -67,7 +72,7 @@ async def cmd_start(message):
 
 
 @dp.callback_query(F.data[:7] == 'chatbot')
-async def start_bot(callback):
+async def start_ai_chatbot(callback):
     tg_user_id = str(callback.from_user.id)
     if available_api_users:
         tg_users_api_users[tg_user_id] = available_api_users.popleft()
@@ -76,7 +81,7 @@ async def start_bot(callback):
         return
     await callback.message.edit_reply_markup(reply_marup=None)
     username = tg_users_api_users[tg_user_id]
-    password = api_users_data[username]
+    password = API_USERS_DATA[username]
     payload = {'username': username, 'password': password}
     response = requests.post(
         'http://151.243.217.107/api-token-auth/',
@@ -108,20 +113,38 @@ async def start_bot(callback):
 
 
 @dp.callback_query(F.data[:6] == 'option')
-async def select_option(callback):
+async def process_user_option_choice(callback):
     tg_user_id = str(callback.from_user.id)
     if tg_user_id not in tg_users_bots:
         await callback.message.answer(
             'Чат-бот не выбран. Для просмотра списка чат-ботов введите /start'
         )
         return
+    chatbot_id = tg_users_bots.get(tg_user_id)
     option = callback.data[7:]
+    if option.lower() in EXIT_PHRASES:
+        callback.message.answer(f'Выбор: {option}')
+        payload = {'next': option, 'message': ''}
+        headers = {'Authorization': f'Token {tg_users_tokens[tg_user_id]}'}
+        response = requests.post(
+            f'http://151.243.217.107/api/v1/bots/{chatbot_id}/run/',
+            json=payload, headers=headers
+        )
+        answer = response.json()
+        exit_api_message = answer.get('message')
+        if exit_api_message:
+            await callback.message.answer(exit_api_message)
+        free_resources(tg_user_id)
+        await callback.message.answer(
+            'Чат-бот не выбран. Для просмотра списка чат-ботов введите /start'
+        )
+        return
     tg_users_options[tg_user_id] = option
-    await callback.message.answer(text=f'Выбор: {option}, введите текст')
+    await callback.message.answer(f'Выбор: {option}, введите текст')
 
 
 @dp.message(F.text != '')
-async def get_ai_answer(message):
+async def process_user_message(message):
     tg_user_id = str(message.from_user.id)
     chatbot_id = tg_users_bots.get(tg_user_id)
     if chatbot_id is None:
@@ -147,7 +170,9 @@ async def get_ai_answer(message):
         return
     builder = InlineKeyboardBuilder()
     if answer.get('next') == '-':
-        await message.answer(answer.get('message'))
+        exit_api_message = answer.get('message')
+        if exit_api_message:
+            await message.answer(exit_api_message)
         free_resources(tg_user_id)
         await message.answer(
             'Чат-бот не выбран. Для просмотра списка чат-ботов введите /start'
@@ -157,7 +182,7 @@ async def get_ai_answer(message):
         builder.button(text=option, callback_data=f'option {option}')
     builder.adjust(1)
     await message.answer(
-        answer.get('message'),
+        answer.get('message', 'Выберите опцию:'),
         reply_markup=builder.as_markup()
     )
     tg_users_options.pop(tg_user_id)
