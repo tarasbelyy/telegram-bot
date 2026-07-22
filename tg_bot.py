@@ -26,7 +26,8 @@ EXIT_PHRASES = {
 }
 
 tg_users_tokens = dict()
-tg_users_bots = dict()
+tg_users_bots_ids = dict()
+tg_users_bots_names = dict()
 tg_users_options = dict()
 
 
@@ -39,7 +40,8 @@ dp = Dispatcher()
 
 def free_resources(tg_user_id):
     tg_users_tokens.pop(tg_user_id, None)
-    tg_users_bots.pop(tg_user_id, None)
+    tg_users_bots_ids.pop(tg_user_id, None)
+    tg_users_bots_names.pop(tg_user_id, None)
     tg_users_options.pop(tg_user_id, None)
     if tg_user_id in tg_users_api_users:
         username = tg_users_api_users.pop(tg_user_id)
@@ -65,7 +67,7 @@ async def start_telegram_bot(message):
         text_message += f'\n{chatbot.get("description")}'
         builder.button(
             text=chatbot.get('name'),
-            callback_data=f'chatbot {chatbot.get("id")}'
+            callback_data=f'chatbot {chatbot.get("id")} {chatbot.get("name")}'
         )
     builder.adjust(1)
     await message.answer(text_message, reply_markup=builder.as_markup())
@@ -89,7 +91,9 @@ async def start_ai_chatbot(callback):
     )
     token = response.json().get('token')
     tg_users_tokens[tg_user_id] = token
-    chatbot_id = callback.data[8:]
+    parts = callback.data.split(' ')
+    chatbot_id = parts[1]
+    chatbot_name = ' '.join(parts[2:])
     headers = {'Authorization': f'Token {token}'}
     response = requests.get(
         f'http://151.243.217.107/api/v1/bots/{chatbot_id}/run/',
@@ -101,13 +105,14 @@ async def start_ai_chatbot(callback):
             'Ошибка. Для просмотра списка чат-ботов введите /start'
         )
         return
-    tg_users_bots[tg_user_id] = chatbot_id
+    tg_users_bots_ids[tg_user_id] = chatbot_id
+    tg_users_bots_names[tg_user_id] = chatbot_name
     builder = InlineKeyboardBuilder()
     for option in answer.get('next'):
         builder.button(text=option, callback_data=f'option {option}')
     builder.adjust(1)
     await callback.message.answer(
-        answer.get('message'),
+        f'- {chatbot_name}:\n{answer.get('message', 'Выберите опцию:')}',
         reply_markup=builder.as_markup()
     )
 
@@ -115,12 +120,13 @@ async def start_ai_chatbot(callback):
 @dp.callback_query(F.data[:6] == 'option')
 async def process_user_option_choice(callback):
     tg_user_id = str(callback.from_user.id)
-    if tg_user_id not in tg_users_bots:
+    if tg_user_id not in tg_users_bots_ids:
         await callback.message.answer(
             'Чат-бот не выбран. Для просмотра списка чат-ботов введите /start'
         )
         return
-    chatbot_id = tg_users_bots.get(tg_user_id)
+    chatbot_id = tg_users_bots_ids.get(tg_user_id)
+    chatbot_name = tg_users_bots_names.get(tg_user_id)
     option = callback.data[7:]
     if option.lower() in EXIT_PHRASES:
         callback.message.answer(f'Выбор: {option}')
@@ -133,7 +139,9 @@ async def process_user_option_choice(callback):
         answer = response.json()
         exit_api_message = answer.get('message')
         if exit_api_message:
-            await callback.message.answer(exit_api_message)
+            await callback.message.answer(
+                f'- {chatbot_name}:\n{exit_api_message}'
+            )
         free_resources(tg_user_id)
         await callback.message.answer(
             'Чат-бот не выбран. Для просмотра списка чат-ботов введите /start'
@@ -146,7 +154,8 @@ async def process_user_option_choice(callback):
 @dp.message(F.text != '')
 async def process_user_message(message):
     tg_user_id = str(message.from_user.id)
-    chatbot_id = tg_users_bots.get(tg_user_id)
+    chatbot_id = tg_users_bots_ids.get(tg_user_id)
+    chatbot_name = tg_users_bots_names.get(tg_user_id)
     if chatbot_id is None:
         await message.answer(
             'Чат-бот не выбран. Для просмотра списка чат-ботов введите /start'
@@ -172,7 +181,9 @@ async def process_user_message(message):
     if answer.get('next') == '-':
         exit_api_message = answer.get('message')
         if exit_api_message:
-            await message.answer(exit_api_message)
+            await message.answer(
+                f'- {chatbot_name}:\n{exit_api_message}'
+            )
         free_resources(tg_user_id)
         await message.answer(
             'Чат-бот не выбран. Для просмотра списка чат-ботов введите /start'
@@ -182,7 +193,7 @@ async def process_user_message(message):
         builder.button(text=option, callback_data=f'option {option}')
     builder.adjust(1)
     await message.answer(
-        answer.get('message', 'Выберите опцию:'),
+        f'- {chatbot_name}:\n{answer.get('message', 'Выберите опцию:')}',
         reply_markup=builder.as_markup()
     )
     tg_users_options.pop(tg_user_id)
