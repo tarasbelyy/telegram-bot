@@ -15,7 +15,7 @@ API_USERS_NUMBER = int(os.getenv('API_USERS_NUMBER', '1'))
 
 API_USERS_DATA = dict()
 
-for i in range(API_USERS_NUMBER):
+for i in range(1, API_USERS_NUMBER + 1):
     username = os.getenv(f'API_USERNAME_{i}')
     password = os.getenv(f'API_PASSWORD_{i}')
     API_USERS_DATA[username] = password
@@ -195,8 +195,16 @@ async def process_user_message(message):
     for option in answer.get('next'):
         builder.button(text=option, callback_data=f'option {option}')
     builder.adjust(1)
+    message_text = f'- {chatbot_name}:\n'
+    api_answer_text = answer.get('message')
+    if api_answer_text:
+        message_text += api_answer_text
+        message_text += f'\n\n(Символов: {len(api_answer_text)})'
+        message_text += f'\n(Токены ответа: {answer.get("completion_tokens")})'
+    else:
+        message_text += 'Выберите опцию:'
     await message.answer(
-        f'- {chatbot_name}:\n{answer.get('message', 'Выберите опцию:')}',
+        message_text,
         reply_markup=builder.as_markup()
     )
     tg_users_options.pop(tg_user_id)
