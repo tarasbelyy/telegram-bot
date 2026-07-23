@@ -30,7 +30,6 @@ tg_users_bots_ids = dict()
 tg_users_bots_names = dict()
 tg_users_options = dict()
 
-
 available_api_users = deque(API_USERS_DATA.keys())
 tg_users_api_users = dict()
 
