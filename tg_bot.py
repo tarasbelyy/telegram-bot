@@ -199,7 +199,8 @@ async def process_user_message(message):
     if api_answer_text:
         message_text += api_answer_text
         message_text += f'\n\n(Символов: {len(api_answer_text)})'
-        message_text += f'\n(Токены ответа: {answer.get("completion_tokens")})'
+        completion_tokens = answer.get('tokens').get('completion')
+        message_text += f'\n(Токены ответа: {completion_tokens})'
     else:
         message_text += 'Выберите опцию:'
     await message.answer(
