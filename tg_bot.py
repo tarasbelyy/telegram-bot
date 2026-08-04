@@ -13,6 +13,8 @@ load_dotenv()
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 API_USERS_NUMBER = int(os.getenv('API_USERS_NUMBER', '1'))
 
+BASE_URL = 'https://scaichatbot.3utilities.com'
+
 API_USERS_DATA = dict()
 
 for i in range(1, API_USERS_NUMBER + 1):
@@ -52,7 +54,8 @@ async def start_telegram_bot(message):
     tg_user_id = str(message.from_user.id)
     free_resources(tg_user_id)
     builder = InlineKeyboardBuilder()
-    response = requests.get('http://151.243.217.107/api/v1/bots/')
+    url = BASE_URL + '/api/v1/bots/'
+    response = requests.get(url)
     chatbots = response.json()
     if not isinstance(chatbots, list):
         await message.answer('Ошибка. Попробуйте позже')
@@ -85,20 +88,16 @@ async def start_ai_chatbot(callback):
     username = tg_users_api_users[tg_user_id]
     password = API_USERS_DATA[username]
     payload = {'username': username, 'password': password}
-    response = requests.post(
-        'http://151.243.217.107/api-token-auth/',
-        json=payload
-    )
+    url = BASE_URL + '/api-token-auth/'
+    response = requests.post(url, json=payload)
     token = response.json().get('token')
     tg_users_tokens[tg_user_id] = token
     parts = callback.data.split(' ')
     chatbot_id = parts[1]
     chatbot_name = ' '.join(parts[2:])
     headers = {'Authorization': f'Token {token}'}
-    response = requests.get(
-        f'http://151.243.217.107/api/v1/bots/{chatbot_id}/run/',
-        headers=headers
-    )
+    url = BASE_URL + f'/api/v1/bots/{chatbot_id}/run/'
+    response = requests.get(url, headers=headers)
     answer = response.json()
     if 'next' not in answer:
         await callback.message.answer(
@@ -134,10 +133,8 @@ async def process_user_option_choice(callback):
         await callback.message.answer(f'Выбор: {option}')
         payload = {'next': option, 'message': ''}
         headers = {'Authorization': f'Token {tg_users_tokens[tg_user_id]}'}
-        response = requests.post(
-            f'http://151.243.217.107/api/v1/bots/{chatbot_id}/run/',
-            json=payload, headers=headers
-        )
+        url = BASE_URL + f'/api/v1/bots/{chatbot_id}/run/'
+        response = requests.post(url, json=payload, headers=headers)
         answer = response.json()
         exit_api_message = answer.get('message')
         if exit_api_message:
@@ -169,10 +166,8 @@ async def process_user_message(message):
         return
     payload = {'next': option, 'message': message.text}
     headers = {'Authorization': f'Token {tg_users_tokens[tg_user_id]}'}
-    response = requests.post(
-        f'http://151.243.217.107/api/v1/bots/{chatbot_id}/run/',
-        json=payload, headers=headers
-    )
+    url = BASE_URL + f'/api/v1/bots/{chatbot_id}/run/'
+    response = requests.post(url, json=payload, headers=headers)
     answer = response.json()
     if 'next' not in answer:
         await message.answer(
