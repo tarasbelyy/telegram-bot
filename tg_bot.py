@@ -25,12 +25,15 @@ for i in range(1, API_USERS_NUMBER + 1):
 EXIT_PHRASES = {
     'завершить',
     'выход',
+    'exit',
 }
 
 tg_users_tokens = dict()
 tg_users_bots_ids = dict()
 tg_users_bots_names = dict()
-tg_users_options = dict()
+tg_users_selected_options = dict()
+tg_users_all_options = dict()
+tg_users_reselect_messages = dict()
 
 available_api_users = deque(API_USERS_DATA.keys())
 tg_users_api_users = dict()
@@ -43,7 +46,9 @@ def free_resources(tg_user_id):
     tg_users_tokens.pop(tg_user_id, None)
     tg_users_bots_ids.pop(tg_user_id, None)
     tg_users_bots_names.pop(tg_user_id, None)
-    tg_users_options.pop(tg_user_id, None)
+    tg_users_selected_options.pop(tg_user_id, None)
+    tg_users_all_options.pop(tg_user_id, None)
+    tg_users_reselect_messages.pop(tg_user_id, None)
     if tg_user_id in tg_users_api_users:
         username = tg_users_api_users.pop(tg_user_id)
         available_api_users.append(username)
@@ -106,8 +111,9 @@ async def start_ai_chatbot(callback):
         return
     tg_users_bots_ids[tg_user_id] = chatbot_id
     tg_users_bots_names[tg_user_id] = chatbot_name
+    tg_users_all_options[tg_user_id] = answer.get('next')
     builder = InlineKeyboardBuilder()
-    for option in answer.get('next'):
+    for option in tg_users_all_options[tg_user_id]:
         builder.button(text=option, callback_data=f'option {option}')
     builder.adjust(1)
     await callback.message.answer(
@@ -146,21 +152,51 @@ async def process_user_option_choice(callback):
             'Чат-бот не выбран. Для просмотра списка чат-ботов введите /start'
         )
         return
-    tg_users_options[tg_user_id] = option
-    await callback.message.answer(f'Выбор: {option}, введите текст')
+    tg_users_selected_options[tg_user_id] = option
+    builder = InlineKeyboardBuilder()
+    builder.button(text='назад к выбору опции', callback_data='reselect')
+    tg_users_reselect_messages[tg_user_id] = await callback.message.answer(
+        f'Выбор: {option}, введите текст\n(или вернитесь к выбору опции)',
+        reply_markup=builder.as_markup()
+    )
+
+
+@dp.callback_query(F.data == 'reselect')
+async def process_option_reselection(callback):
+    await callback.answer()
+    await callback.message.edit_reply_markup(reply_marup=None)
+    tg_user_id = str(callback.from_user.id)
+    chatbot_name = tg_users_bots_names.get(tg_user_id)
+    if chatbot_name is None:
+        await callback.message.answer(
+            'Чат-бот не выбран. Для просмотра списка чат-ботов введите /start'
+        )
+        return
+    builder = InlineKeyboardBuilder()
+    for option in tg_users_all_options[tg_user_id]:
+        builder.button(text=option, callback_data=f'option {option}')
+    builder.adjust(1)
+    message_text = f'({chatbot_name})\nВыберите опцию:'
+    await callback.message.answer(
+        message_text,
+        reply_markup=builder.as_markup()
+    )
 
 
 @dp.message(F.text != '')
 async def process_user_message(message):
     tg_user_id = str(message.from_user.id)
     chatbot_id = tg_users_bots_ids.get(tg_user_id)
+    reselect_message = tg_users_reselect_messages.pop(tg_user_id, None)
+    if reselect_message is not None:
+        await reselect_message.edit_reply_markup(reply_marup=None)
     if chatbot_id is None:
         await message.answer(
             'Чат-бот не выбран. Для просмотра списка чат-ботов введите /start'
         )
         return
     chatbot_name = tg_users_bots_names.get(tg_user_id)
-    option = tg_users_options.get(tg_user_id)
+    option = tg_users_selected_options.get(tg_user_id)
     if option is None:
         await message.answer('Выберите опцию')
         return
@@ -174,7 +210,6 @@ async def process_user_message(message):
             'Ошибка. Для просмотра списка чат-ботов введите /start'
         )
         return
-    builder = InlineKeyboardBuilder()
     if answer.get('next') == '-':
         exit_api_message = answer.get('message')
         if exit_api_message:
@@ -186,7 +221,9 @@ async def process_user_message(message):
             'Чат-бот не выбран. Для просмотра списка чат-ботов введите /start'
         )
         return
-    for option in answer.get('next'):
+    builder = InlineKeyboardBuilder()
+    tg_users_all_options[tg_user_id] = answer.get('next')
+    for option in tg_users_all_options[tg_user_id]:
         builder.button(text=option, callback_data=f'option {option}')
     builder.adjust(1)
     message_text = f'- {chatbot_name}:\n'
@@ -202,7 +239,7 @@ async def process_user_message(message):
         message_text,
         reply_markup=builder.as_markup()
     )
-    tg_users_options.pop(tg_user_id)
+    tg_users_selected_options.pop(tg_user_id)
 
 
 async def main():
